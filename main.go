@@ -13,6 +13,8 @@ import (
 	"github.com/joho/godotenv"
 
 	"gohublink/backend/db"
+	"gohublink/backend/middleware"
+	"gohublink/backend/routes"
 )
 
 func main() {
@@ -29,8 +31,18 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := db.Migrate(); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	if err := db.Seed(); err != nil {
+		log.Fatalf("Failed to seed database: %v", err)
+	}
+
 	r := gin.Default()
 	r.SetTrustedProxies(nil)
+	r.Use(middleware.CORS())
+
+	routes.Setup(r)
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{

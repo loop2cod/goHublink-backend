@@ -1,16 +1,15 @@
 package db
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
-	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-var Pool *pgxpool.Pool
+var DB *gorm.DB
 
 func Init() error {
 	dsn := os.Getenv("DATABASE_URL")
@@ -26,38 +25,31 @@ func Init() error {
 		)
 	}
 
-	config, err := pgxpool.ParseConfig(dsn)
+	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return fmt.Errorf("unable to parse db config: %w", err)
+		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
-	config.MaxConns = 10
-	config.MinConns = 2
-	config.MaxConnLifetime = time.Hour
-	config.MaxConnIdleTime = 30 * time.Minute
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	sqlDB, err := gormDB.DB()
 	if err != nil {
-		return fmt.Errorf("unable to create connection pool: %w", err)
+		return fmt.Errorf("unable to get sql db: %w", err)
 	}
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(2)
+	sqlDB.SetConnMaxLifetime(0)
 
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return fmt.Errorf("unable to ping database: %w", err)
-	}
-
-	Pool = pool
+	DB = gormDB
 	log.Println("Database connection established")
 	return nil
 }
 
 func Close() {
-	if Pool != nil {
-		Pool.Close()
-		log.Println("Database connection closed")
+	if DB != nil {
+		sqlDB, err := DB.DB()
+		if err == nil {
+			sqlDB.Close()
+			log.Println("Database connection closed")
+		}
 	}
 }
 
