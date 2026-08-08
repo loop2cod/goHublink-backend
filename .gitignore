@@ -1,0 +1,15 @@
+# Compiled binary
+backend
+main
+
+# Test binary
+*.test
+*.out
+
+# Env
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
