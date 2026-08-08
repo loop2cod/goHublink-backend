@@ -8,6 +8,7 @@ import (
 )
 
 func Setup(r *gin.Engine) {
+	r.GET("/qr/:spot_id", handlers.QRRedirect)
 	r.POST("/api/auth/login", handlers.Login)
 	r.POST("/api/auth/refresh", handlers.RefreshToken)
 	r.POST("/api/auth/logout", handlers.Logout)
@@ -17,5 +18,7 @@ func Setup(r *gin.Engine) {
 		protected.POST("/spots", handlers.CreateSpot)
 		protected.GET("/spots", handlers.ListSpots)
 		protected.GET("/spots/:id", handlers.GetSpot)
+		protected.GET("/scans", handlers.ListScans)
+		protected.GET("/scans/:id", handlers.GetScan)
 	}
 }

@@ -11,10 +11,24 @@ import (
 // Migrate syncs the database schema with the models.
 // Any change made to a model struct is applied automatically on server start.
 func Migrate() error {
-	if err := DB.AutoMigrate(&models.Admin{}, &models.Spot{}, &models.RefreshToken{}); err != nil {
+	if err := ensureScanStatusEnum(); err != nil {
+		return err
+	}
+	if err := DB.AutoMigrate(&models.Admin{}, &models.Spot{}, &models.RefreshToken{}, &models.Scan{}, &models.Customer{}); err != nil {
 		return err
 	}
 	log.Println("Database schema synced with models")
+	return nil
+}
+
+func ensureScanStatusEnum() error {
+	if err := DB.Exec(`DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'scan_status') THEN
+			CREATE TYPE scan_status AS ENUM ('pending', 'matched', 'expired');
+		END IF;
+	END $$;`).Error; err != nil {
+		return err
+	}
 	return nil
 }
 
