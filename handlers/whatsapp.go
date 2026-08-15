@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -387,7 +389,16 @@ func processMessage(value *WhatsAppWebhookValue, msg *WhatsAppWebhookMessage) er
 			return nil
 		}
 
-		updateCustomerActivity(tx, msg.From, value.Metadata.PhoneNumberID)
+		customerName := findCustomerName(value, msg.From)
+		updateCustomerActivity(tx, msg.From, customerName)
+
+		if msg.Type == "text" && msg.Text != nil {
+			token := extractToken(msg.Text.Body)
+			if token != "" {
+				matchScanByToken(tx, token, msg.From, customerName)
+			}
+		}
+
 		return nil
 	})
 }
@@ -542,7 +553,7 @@ func processStatus(status *WhatsAppWebhookStatus) error {
 	return db.DB.Save(&msg).Error
 }
 
-func updateCustomerActivity(tx *gorm.DB, phoneNumber, phoneNumberID string) {
+func updateCustomerActivity(tx *gorm.DB, phoneNumber, customerName string) {
 	var customer models.Customer
 	result := tx.Where("phone_number = ?", phoneNumber).First(&customer)
 
@@ -550,12 +561,14 @@ func updateCustomerActivity(tx *gorm.DB, phoneNumber, phoneNumberID string) {
 		if result.Error == gorm.ErrRecordNotFound {
 			customer = models.Customer{
 				PhoneNumber: phoneNumber,
-				Name:        "",
+				Name:        customerName,
 				FirstScanAt: time.Now(),
 				LastActive:  time.Now(),
 			}
 			if err := tx.Create(&customer).Error; err != nil {
 				log.Printf("Failed to create customer: %v", err)
+			} else {
+				go fetchAndStoreProfilePicture(phoneNumber)
 			}
 		} else {
 			log.Printf("Failed to query customer: %v", result.Error)
@@ -564,9 +577,72 @@ func updateCustomerActivity(tx *gorm.DB, phoneNumber, phoneNumberID string) {
 	}
 
 	customer.LastActive = time.Now()
+	if customerName != "" && customer.Name == "" {
+		customer.Name = customerName
+	}
 	if err := tx.Save(&customer).Error; err != nil {
 		log.Printf("Failed to update customer activity: %v", err)
 	}
+}
+
+func findCustomerName(value *WhatsAppWebhookValue, waID string) string {
+	for _, contact := range value.Contacts {
+		if contact.WaID == waID {
+			return contact.Profile.Name
+		}
+	}
+	return ""
+}
+
+func extractToken(text string) string {
+	trimmed := strings.TrimSpace(text)
+	words := strings.Fields(trimmed)
+	if len(words) == 0 {
+		return ""
+	}
+	last := words[len(words)-1]
+	if len(last) >= scanTokenLength && len(last) <= scanTokenLength+1 {
+		for _, ch := range last {
+			if !isTokenChar(ch) {
+				return ""
+			}
+		}
+		return last
+	}
+	return ""
+}
+
+func isTokenChar(ch rune) bool {
+	return (ch >= 'A' && ch <= 'Z') ||
+		(ch >= 'a' && ch <= 'z') ||
+		(ch >= '0' && ch <= '9')
+}
+
+func matchScanByToken(tx *gorm.DB, token, phoneNumber, customerName string) {
+	var scan models.Scan
+	result := tx.Where("scan_token = ? AND status = ?", token, models.ScanStatusPending).First(&scan)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			log.Printf("No pending scan found for token %s", token)
+		} else {
+			log.Printf("Failed to query scan by token %s: %v", token, result.Error)
+		}
+		return
+	}
+
+	scan.Status = models.ScanStatusMatched
+	scan.PhoneNumber = &phoneNumber
+	scan.CustomerName = &customerName
+
+	if err := tx.Save(&scan).Error; err != nil {
+		log.Printf("Failed to match scan token %s: %v", token, err)
+		return
+	}
+
+	log.Printf("Scan %s matched with customer %s (%s)", scan.ScanToken, customerName, phoneNumber)
+
+	// Welcome message will be sent via template (to be implemented later)
+	// sendWelcomeMessage(phoneNumber, customerName)
 }
 
 func isDuplicateKeyError(err error) bool {
@@ -642,4 +718,48 @@ func parseInt(s string) int {
 		return 100
 	}
 	return n
+}
+
+func fetchAndStoreProfilePicture(phoneNumber string) {
+	accessToken := os.Getenv("WHATSAPP_ACCESS_TOKEN")
+	if accessToken == "" {
+		log.Println("WHATSAPP_ACCESS_TOKEN not set, skipping profile picture fetch")
+		return
+	}
+
+	apiVersion := "v21.0"
+	endpoint := fmt.Sprintf("https://graph.facebook.com/%s/%s/picture?type=large", apiVersion, url.PathEscape(phoneNumber))
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		log.Printf("Failed to create profile picture request: %v", err)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Failed to fetch profile picture for %s: %v", phoneNumber, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Profile picture fetch returned %d: %s", resp.StatusCode, string(body))
+		return
+	}
+
+	finalURL := resp.Request.URL.String()
+	if finalURL == "" {
+		return
+	}
+
+	customer := models.Customer{PhoneNumber: phoneNumber}
+	if err := db.DB.Model(&customer).Update("profile_picture_url", finalURL).Error; err != nil {
+		log.Printf("Failed to store profile picture for %s: %v", phoneNumber, err)
+		return
+	}
+	log.Printf("Stored profile picture for %s", phoneNumber)
 }
