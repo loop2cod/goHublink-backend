@@ -104,27 +104,60 @@ func detectDeviceType(ua string) string {
 }
 
 func clientIP(c *gin.Context) string {
-	ip := c.ClientIP()
-	if len(ip) > 45 {
-		return ip[:45]
-	}
-	return ip
+	return realClientIP(c)
 }
 
-func forwardedIP(c *gin.Context) string {
-	xff := c.GetHeader("X-Forwarded-For")
-	if xff != "" {
-		parts := strings.Split(xff, ",")
-		ip := strings.TrimSpace(parts[0])
-		if ip != "" {
+// realClientIP resolves the actual client IP behind a reverse proxy (Railway,
+// nginx, etc.). It validates forwarded headers so a spoofed X-Forwarded-For
+// cannot inject an arbitrary value, then falls back to the direct peer address.
+func realClientIP(c *gin.Context) string {
+	for _, candidate := range []string{
+		c.GetHeader("X-Forwarded-For"),
+		c.GetHeader("X-Real-IP"),
+	} {
+		if candidate == "" {
+			continue
+		}
+		// X-Forwarded-For is a comma-separated list: "client, proxy1, proxy2".
+		// The first entry is the client; validate it.
+		first := candidate
+		if idx := strings.IndexByte(candidate, ','); idx != -1 {
+			first = candidate[:idx]
+		}
+		first = strings.TrimSpace(first)
+		ip := stripIPPort(first)
+		if net.ParseIP(ip) != nil {
 			return ip
 		}
 	}
-	realIP := c.GetHeader("X-Real-IP")
-	if realIP != "" {
-		return realIP
+
+	ip := c.ClientIP()
+	return stripIPPort(ip)
+}
+
+// stripIPPort removes an optional ":port" suffix from an IP:port string and
+// unwraps the IPv6 bracket form "[::1]:port". It does not touch bare IPs.
+func stripIPPort(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
 	}
-	return clientIP(c)
+	if s[0] == '[' {
+		if idx := strings.IndexByte(s, ']'); idx != -1 {
+			return s[1:idx]
+		}
+		return s
+	}
+	if idx := strings.LastIndexByte(s, ':'); idx != -1 {
+		if net.ParseIP(s[:idx]) != nil {
+			return s[:idx]
+		}
+	}
+	return s
+}
+
+func forwardedIP(c *gin.Context) string {
+	return realClientIP(c)
 }
 
 func netIPFromForwarded(c *gin.Context) string {
@@ -173,7 +206,10 @@ func queryIPVersion(ip string) string {
 }
 
 func lookupGeoIP(ip string) (*geoIPResponse, error) {
-	if ip == "" || ip == "::1" || ip == "127.0.0.1" || strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "10.") {
+	parsed := net.ParseIP(strings.TrimSpace(ip))
+	if parsed == nil || parsed.IsLoopback() || parsed.IsPrivate() ||
+		parsed.IsLinkLocalUnicast() || parsed.IsLinkLocalMulticast() ||
+		parsed.IsUnspecified() || parsed.IsMulticast() {
 		return nil, nil
 	}
 
