@@ -137,6 +137,7 @@ func SendWhatsAppMessage(c *gin.Context) {
 
 	textBody := req.Text
 	now := time.Now()
+	rawPayload, _ := json.Marshal(payload)
 	waMsg := models.WhatsAppMessage{
 		MessageID:  messageID,
 		From:       from,
@@ -144,6 +145,7 @@ func SendWhatsAppMessage(c *gin.Context) {
 		Type:       models.WhatsAppMessageTypeText,
 		Direction:  models.WhatsAppMessageDirectionOutbound,
 		TextBody:   &textBody,
+		RawPayload: rawPayload,
 		Status:     "sent",
 		ReceivedAt: now,
 	}
