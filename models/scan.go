@@ -51,6 +51,7 @@ type Scan struct {
 	Country       string  `gorm:"size:2" json:"country,omitempty"`
 	CountryName   string  `gorm:"size:100" json:"country_name,omitempty"`
 	PostalCode    string  `gorm:"size:20" json:"postal_code,omitempty"`
+	Timezone      string  `gorm:"size:50" json:"timezone,omitempty"`
 	Latitude      float64 `json:"latitude,omitempty"`
 	Longitude     float64 `json:"longitude,omitempty"`
 	LocationAccuracy int   `json:"location_accuracy,omitempty"`
