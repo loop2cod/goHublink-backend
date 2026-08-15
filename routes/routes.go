@@ -24,6 +24,7 @@ func Setup(r *gin.Engine) {
 		protected.GET("/spots", handlers.ListSpots)
 		protected.GET("/spots/:id", handlers.GetSpot)
 		protected.GET("/scans", handlers.ListScans)
+		protected.GET("/scans/by-token/:token", handlers.GetScanByToken)
 		protected.GET("/scans/:id", handlers.GetScan)
 
 		protected.GET("/whatsapp/messages", handlers.ListWhatsAppMessages)

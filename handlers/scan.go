@@ -138,6 +138,26 @@ func GetScan(c *gin.Context) {
 	c.JSON(http.StatusOK, scan)
 }
 
+// GetScanByToken fetches a single scan by its scan token (e.g. "5Z2J6U").
+func GetScanByToken(c *gin.Context) {
+	token := strings.TrimSpace(c.Param("token"))
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "token is required"})
+		return
+	}
+
+	var scan models.Scan
+	if err := db.DB.Where("scan_token = ?", token).First(&scan).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "scan not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, scan)
+}
+
 func generateScanToken(length int) (string, error) {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	buf := make([]byte, length)
