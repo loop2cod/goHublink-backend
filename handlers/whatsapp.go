@@ -544,36 +544,29 @@ func processStatus(status *WhatsAppWebhookStatus) error {
 
 func updateCustomerActivity(tx *gorm.DB, phoneNumber, phoneNumberID string) {
 	var customer models.Customer
-	err := tx.Where("phone_number = ?", phoneNumber).First(&customer).Error
-	if err == gorm.ErrRecordNotFound {
-		name := ""
-		for _, contact := range getContactsFromContext() {
-			if contact.WaID == phoneNumber {
-				name = contact.Profile.Name
-				break
+	result := tx.Where("phone_number = ?", phoneNumber).First(&customer)
+
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			customer = models.Customer{
+				PhoneNumber: phoneNumber,
+				Name:        "",
+				FirstScanAt: time.Now(),
+				LastActive:  time.Now(),
 			}
-		}
-		customer = models.Customer{
-			PhoneNumber: phoneNumber,
-			Name:        name,
-			FirstScanAt: time.Now(),
-			LastActive:  time.Now(),
-		}
-		if err := tx.Create(&customer).Error; err != nil {
-			log.Printf("Failed to create customer: %v", err)
+			if err := tx.Create(&customer).Error; err != nil {
+				log.Printf("Failed to create customer: %v", err)
+			}
+		} else {
+			log.Printf("Failed to query customer: %v", result.Error)
 		}
 		return
 	}
 
-	now := time.Now()
-	customer.LastActive = now
+	customer.LastActive = time.Now()
 	if err := tx.Save(&customer).Error; err != nil {
 		log.Printf("Failed to update customer activity: %v", err)
 	}
-}
-
-func getContactsFromContext() []WhatsAppWebhookContact {
-	return []WhatsAppWebhookContact{}
 }
 
 func isDuplicateKeyError(err error) bool {
