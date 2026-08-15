@@ -42,7 +42,7 @@ type Scan struct {
 	OSVersion      string `gorm:"size:50" json:"os_version,omitempty"`
 	BrowserName    string `gorm:"size:50" json:"browser_name,omitempty"`
 	BrowserVersion string `gorm:"size:50" json:"browser_version,omitempty"`
-	Language       string `gorm:"size:20" json:"language,omitempty"`
+	Language       string `gorm:"size:255" json:"language,omitempty"`
 
 	// Location
 	City          string  `gorm:"size:50" json:"city"`
