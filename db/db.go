@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -13,16 +14,9 @@ var DB *gorm.DB
 
 func Init() error {
 	dsn := os.Getenv("DATABASE_URL")
+
 	if dsn == "" {
-		dsn = fmt.Sprintf(
-			"postgres://%s:%s@%s:%s/%s?sslmode=%s",
-			os.Getenv("DB_USER"),
-			os.Getenv("DB_PASSWORD"),
-			os.Getenv("DB_HOST"),
-			os.Getenv("DB_PORT"),
-			os.Getenv("DB_NAME"),
-			getEnv("DB_SSLMODE", "disable"),
-		)
+		dsn = buildDSN()
 	}
 
 	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -58,4 +52,33 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func buildDSN() string {
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+	sslmode := getEnv("DB_SSLMODE", "disable")
+
+	if host == "" || port == "" || user == "" || password == "" || dbname == "" {
+		log.Fatal("Database configuration incomplete: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, and DB_NAME must be set")
+	}
+
+	if isRailwayEnvironment() && !strings.Contains(host, "railway.internal") {
+		privateDomain := os.Getenv("RAILWAY_PRIVATE_DOMAIN")
+		if privateDomain != "" && !strings.Contains(host, ".") {
+			host = "postgresql." + privateDomain
+		}
+	}
+
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		user, password, host, port, dbname, sslmode,
+	)
+}
+
+func isRailwayEnvironment() bool {
+	return os.Getenv("RAILWAY_ENVIRONMENT") != "" || os.Getenv("RAILWAY_PRIVATE_DOMAIN") != ""
 }
