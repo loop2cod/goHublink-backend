@@ -14,10 +14,31 @@ func Migrate() error {
 	if err := ensureScanStatusEnum(); err != nil {
 		return err
 	}
-	if err := DB.AutoMigrate(&models.Admin{}, &models.Spot{}, &models.RefreshToken{}, &models.Scan{}, &models.Customer{}); err != nil {
+	if err := ensureWhatsAppEnums(); err != nil {
+		return err
+	}
+	if err := DB.AutoMigrate(&models.Admin{}, &models.Spot{}, &models.RefreshToken{}, &models.Scan{}, &models.Customer{}, &models.WhatsAppMessage{}, &models.WhatsAppWebhookEvent{}); err != nil {
 		return err
 	}
 	log.Println("Database schema synced with models")
+	return nil
+}
+
+func ensureWhatsAppEnums() error {
+	if err := DB.Exec(`DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'whatsapp_message_type') THEN
+			CREATE TYPE whatsapp_message_type AS ENUM ('text', 'image', 'audio', 'video', 'document', 'sticker', 'location', 'contacts', 'interactive', 'reaction', 'system', 'unknown');
+		END IF;
+	END $$;`).Error; err != nil {
+		return err
+	}
+	if err := DB.Exec(`DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'whatsapp_message_direction') THEN
+			CREATE TYPE whatsapp_message_direction AS ENUM ('inbound', 'outbound');
+		END IF;
+	END $$;`).Error; err != nil {
+		return err
+	}
 	return nil
 }
 

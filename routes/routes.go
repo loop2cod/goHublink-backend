@@ -13,6 +13,9 @@ func Setup(r *gin.Engine) {
 	r.POST("/api/auth/refresh", handlers.RefreshToken)
 	r.POST("/api/auth/logout", handlers.Logout)
 
+	r.GET("/webhook/whatsapp", handlers.VerifyWebhook)
+	r.POST("/webhook/whatsapp", handlers.ReceiveWhatsAppWebhook)
+
 	protected := r.Group("/api", auth.Middleware())
 	{
 		protected.POST("/spots", handlers.CreateSpot)
@@ -20,5 +23,8 @@ func Setup(r *gin.Engine) {
 		protected.GET("/spots/:id", handlers.GetSpot)
 		protected.GET("/scans", handlers.ListScans)
 		protected.GET("/scans/:id", handlers.GetScan)
+
+		protected.GET("/whatsapp/messages", handlers.ListWhatsAppMessages)
+		protected.GET("/whatsapp/messages/:id", handlers.GetWhatsAppMessage)
 	}
 }
