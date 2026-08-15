@@ -28,6 +28,9 @@ func Setup(r *gin.Engine) {
 		protected.GET("/scans/by-token/:token", handlers.GetScanByToken)
 		protected.GET("/scans/:id", handlers.GetScan)
 
+		protected.GET("/customers", handlers.ListCustomers)
+		protected.GET("/customers/:phone", handlers.GetCustomer)
+
 		protected.GET("/whatsapp/messages", handlers.ListWhatsAppMessages)
 		protected.GET("/whatsapp/messages/:id", handlers.GetWhatsAppMessage)
 	}
