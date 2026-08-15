@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -185,6 +186,19 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// parsePositiveInt parses a positive integer query value, returning fallback
+// when the value is missing, non-numeric, or not positive.
+func parsePositiveInt(s string, fallback int) int {
+	if strings.TrimSpace(s) == "" {
+		return fallback
+	}
+	var n int
+	if _, err := fmt.Sscanf(s, "%d", &n); err != nil || n <= 0 {
+		return fallback
+	}
+	return n
 }
 
 func extractHost(referrer string) string {

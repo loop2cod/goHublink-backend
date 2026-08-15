@@ -101,13 +101,20 @@ func formatWhatsAppMessage(token string) string {
 }
 
 func ListScans(c *gin.Context) {
-	var scans []models.Scan
-
 	status := strings.TrimSpace(c.Query("status"))
 	spotID := strings.TrimSpace(c.Query("spot_id"))
 	token := strings.TrimSpace(c.Query("token"))
+	device := strings.ToLower(strings.TrimSpace(c.Query("device")))
+	q := strings.TrimSpace(c.Query("q"))
 
-	query := db.DB.Order("scanned_at DESC")
+	page := parsePositiveInt(c.Query("page"), 1)
+	limit := parsePositiveInt(c.Query("limit"), 10)
+	if limit > 100 {
+		limit = 100
+	}
+
+	query := db.DB.Model(&models.Scan{})
+
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -117,12 +124,92 @@ func ListScans(c *gin.Context) {
 	if token != "" {
 		query = query.Where("scan_token ILIKE ?", "%"+token+"%")
 	}
+	if device != "" {
+		query = query.Where("LOWER(device_type) = ?", device)
+	}
+	if q != "" {
+		like := "%" + q + "%"
+		query = query.Where(
+			"scan_token ILIKE ? OR spot_id ILIKE ? OR ip_address ILIKE ? OR "+
+				"COALESCE(customer_name,'') ILIKE ? OR COALESCE(city,'') ILIKE ? OR "+
+				"COALESCE(region,'') ILIKE ? OR COALESCE(country_name,'') ILIKE ? OR "+
+				"LOWER(device_type) ILIKE ? OR COALESCE(os_name,'') ILIKE ? OR "+
+				"COALESCE(browser_name,'') ILIKE ? OR COALESCE(isp,'') ILIKE ?",
+			like, like, like, like, like, like, like,
+			strings.ToLower(q)+"%", like, like, like,
+		)
+	}
 
-	if err := query.Find(&scans).Error; err != nil {
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"scans": scans})
+
+	var scans []models.Scan
+	if err := query.
+		Order("scanned_at DESC").
+		Offset((page - 1) * limit).
+		Limit(limit).
+		Find(&scans).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	totalPages := int64(0)
+	if total > 0 {
+		totalPages = (total + int64(limit) - 1) / int64(limit)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"scans":       scans,
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": totalPages,
+	})
+}
+
+// ScanStats returns aggregate counts and the distinct list of device types
+// across all scans, used for the listing summary cards and device filter
+// (independent of the current filters/pagination).
+func ScanStats(c *gin.Context) {
+	var total, matched, pending, expired int64
+
+	if err := db.DB.Model(&models.Scan{}).Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := db.DB.Model(&models.Scan{}).Where("status = ?", models.ScanStatusMatched).Count(&matched).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := db.DB.Model(&models.Scan{}).Where("status = ?", models.ScanStatusPending).Count(&pending).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := db.DB.Model(&models.Scan{}).Where("status = ?", models.ScanStatusExpired).Count(&expired).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var devices []string
+	if err := db.DB.Model(&models.Scan{}).
+		Distinct().
+		Where("device_type <> ''").
+		Order("device_type ASC").
+		Pluck("device_type", &devices).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total":   total,
+		"matched": matched,
+		"pending": pending,
+		"expired": expired,
+		"devices": devices,
+	})
 }
 
 func GetScan(c *gin.Context) {
