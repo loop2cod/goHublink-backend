@@ -279,14 +279,27 @@ func VerifyWebhook(c *gin.Context) {
 }
 
 func ReceiveWhatsAppWebhook(c *gin.Context) {
-	if !verifySignature(c) {
+	body, err := c.GetRawData()
+	if err != nil {
+		log.Printf("WhatsApp webhook: failed to read body: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		return
+	}
+
+	if len(body) == 0 {
+		log.Println("WhatsApp webhook: empty body, likely health check")
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		return
+	}
+
+	if !verifySignature(c, body) {
 		log.Printf("WhatsApp webhook: invalid signature")
 		c.JSON(http.StatusForbidden, gin.H{"error": "invalid signature"})
 		return
 	}
 
 	var payload WhatsAppWebhookPayload
-	if err := c.ShouldBindJSON(&payload); err != nil {
+	if err := json.Unmarshal(body, &payload); err != nil {
 		log.Printf("WhatsApp webhook: invalid JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 		return
@@ -319,7 +332,7 @@ func ReceiveWhatsAppWebhook(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-func verifySignature(c *gin.Context) bool {
+func verifySignature(c *gin.Context, body []byte) bool {
 	appSecret := getEnv("WHATSAPP_APP_SECRET", "")
 	if appSecret == "" {
 		log.Println("WARNING: WHATSAPP_APP_SECRET not set, skipping signature verification")
@@ -328,11 +341,7 @@ func verifySignature(c *gin.Context) bool {
 
 	signature := c.GetHeader("X-Hub-Signature-256")
 	if signature == "" {
-		return false
-	}
-
-	body, err := c.GetRawData()
-	if err != nil {
+		log.Println("WhatsApp webhook: missing X-Hub-Signature-256 header")
 		return false
 	}
 
@@ -340,7 +349,12 @@ func verifySignature(c *gin.Context) bool {
 	mac.Write(body)
 	expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 
-	return hmac.Equal([]byte(expected), []byte(signature))
+	if !hmac.Equal([]byte(expected), []byte(signature)) {
+		log.Printf("WhatsApp webhook: signature mismatch\n  expected: %s\n  received: %s", expected, signature)
+		return false
+	}
+
+	return true
 }
 
 func saveWebhookEvent(payload *WhatsAppWebhookPayload, value WhatsAppWebhookValue) {
