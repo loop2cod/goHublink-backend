@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -566,7 +567,9 @@ func isDuplicateKeyError(err error) bool {
 }
 
 func getEnv(key, fallback string) string {
-	// This would typically use os.Getenv, but keeping consistent with existing pattern
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return fallback
 }
 
