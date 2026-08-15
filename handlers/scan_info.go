@@ -108,21 +108,25 @@ func clientIP(c *gin.Context) string {
 }
 
 // realClientIP resolves the actual client IP behind a reverse proxy (Railway,
-// nginx, etc.). It validates forwarded headers so a spoofed X-Forwarded-For
-// cannot inject an arbitrary value, then falls back to the direct peer address.
+// nginx, Cloudflare, etc.). It checks the standard forwarding headers first,
+// validates them so a spoofed header cannot inject an arbitrary value, then
+// falls back to the direct peer address.
 func realClientIP(c *gin.Context) string {
-	for _, candidate := range []string{
-		c.GetHeader("X-Forwarded-For"),
-		c.GetHeader("X-Real-IP"),
+	for _, header := range []string{
+		"CF-Connecting-IP",
+		"True-Client-IP",
+		"X-Real-IP",
+		"X-Forwarded-For",
 	} {
-		if candidate == "" {
+		value := c.GetHeader(header)
+		if value == "" {
 			continue
 		}
 		// X-Forwarded-For is a comma-separated list: "client, proxy1, proxy2".
 		// The first entry is the client; validate it.
-		first := candidate
-		if idx := strings.IndexByte(candidate, ','); idx != -1 {
-			first = candidate[:idx]
+		first := value
+		if idx := strings.IndexByte(value, ','); idx != -1 {
+			first = value[:idx]
 		}
 		first = strings.TrimSpace(first)
 		ip := stripIPPort(first)

@@ -39,7 +39,16 @@ func main() {
 	}
 
 	r := gin.Default()
-	r.SetTrustedProxies(nil)
+	// Trust forwarded headers (X-Forwarded-For, X-Real-IP) coming from the
+	// reverse proxy. Railway's proxy egresses from the Carrier-Grade NAT range
+	// 100.64.0.0/10 as well as private ranges, so trust those so Gin resolves
+	// the real client IP instead of the proxy IP.
+	r.SetTrustedProxies([]string{
+		"100.64.0.0/10", // Railway CGNAT
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+	})
 	r.Use(middleware.CORS())
 
 	routes.Setup(r)
