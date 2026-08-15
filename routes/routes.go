@@ -33,5 +33,7 @@ func Setup(r *gin.Engine) {
 
 		protected.GET("/whatsapp/messages", handlers.ListWhatsAppMessages)
 		protected.GET("/whatsapp/messages/:id", handlers.GetWhatsAppMessage)
+		protected.GET("/whatsapp/conversation/:phone", handlers.ListCustomerConversation)
+		protected.POST("/whatsapp/send", handlers.SendWhatsAppMessage)
 	}
 }
