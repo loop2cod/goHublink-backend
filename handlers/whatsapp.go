@@ -19,14 +19,8 @@ import (
 	"gohublink/backend/models"
 )
 
-type WhatsAppWebhookVerifyRequest struct {
-	Mode      string `form:"hub.mode"`
-	Challenge string `form:"hub.challenge"`
-	VerifyToken string `form:"hub.verify_token"`
-}
-
 type WhatsAppWebhookEntry struct {
-	ID      string                 `json:"id"`
+	ID      string                  `json:"id"`
 	Changes []WhatsAppWebhookChange `json:"changes"`
 }
 
@@ -58,22 +52,22 @@ type WhatsAppWebhookProfile struct {
 }
 
 type WhatsAppWebhookMessage struct {
-	ID              string                        `json:"id"`
-	From            string                        `json:"from"`
-	To              string                        `json:"to"`
-	Timestamp       string                        `json:"timestamp"`
-	Type            string                        `json:"type"`
-	Text            *WhatsAppWebhookText          `json:"text,omitempty"`
-	Image           *WhatsAppWebhookMedia         `json:"image,omitempty"`
-	Audio           *WhatsAppWebhookMedia         `json:"audio,omitempty"`
-	Video           *WhatsAppWebhookMedia         `json:"video,omitempty"`
-	Document        *WhatsAppWebhookMedia         `json:"document,omitempty"`
-	Sticker         *WhatsAppWebhookMedia         `json:"sticker,omitempty"`
-	Location        *WhatsAppWebhookLocation      `json:"location,omitempty"`
-	Contacts        []WhatsAppWebhookContactData  `json:"contacts,omitempty"`
-	Interactive     *WhatsAppWebhookInteractive   `json:"interactive,omitempty"`
-	Reaction        *WhatsAppWebhookReaction      `json:"reaction,omitempty"`
-	Context         *WhatsAppWebhookContext       `json:"context,omitempty"`
+	ID          string                       `json:"id"`
+	From        string                       `json:"from"`
+	To          string                       `json:"to"`
+	Timestamp   string                       `json:"timestamp"`
+	Type        string                       `json:"type"`
+	Text        *WhatsAppWebhookText         `json:"text,omitempty"`
+	Image       *WhatsAppWebhookMedia        `json:"image,omitempty"`
+	Audio       *WhatsAppWebhookMedia        `json:"audio,omitempty"`
+	Video       *WhatsAppWebhookMedia        `json:"video,omitempty"`
+	Document    *WhatsAppWebhookMedia        `json:"document,omitempty"`
+	Sticker     *WhatsAppWebhookMedia        `json:"sticker,omitempty"`
+	Location    *WhatsAppWebhookLocation     `json:"location,omitempty"`
+	Contacts    []WhatsAppWebhookContactData `json:"contacts,omitempty"`
+	Interactive *WhatsAppWebhookInteractive  `json:"interactive,omitempty"`
+	Reaction    *WhatsAppWebhookReaction     `json:"reaction,omitempty"`
+	Context     *WhatsAppWebhookContext      `json:"context,omitempty"`
 }
 
 type WhatsAppWebhookText struct {
@@ -96,13 +90,13 @@ type WhatsAppWebhookLocation struct {
 }
 
 type WhatsAppWebhookContactData struct {
-	Name         WhatsAppWebhookContactName `json:"name"`
-	Phones       []WhatsAppWebhookPhone     `json:"phones,omitempty"`
-	Emails       []WhatsAppWebhookEmail     `json:"emails,omitempty"`
-	Addresses    []WhatsAppWebhookAddress   `json:"addresses,omitempty"`
-	Urls         []WhatsAppWebhookURL       `json:"urls,omitempty"`
-	Birthday     string                     `json:"birthday,omitempty"`
-	Org          WhatsAppWebhookOrg         `json:"org,omitempty"`
+	Name      WhatsAppWebhookContactName `json:"name"`
+	Phones    []WhatsAppWebhookPhone     `json:"phones,omitempty"`
+	Emails    []WhatsAppWebhookEmail     `json:"emails,omitempty"`
+	Addresses []WhatsAppWebhookAddress   `json:"addresses,omitempty"`
+	Urls      []WhatsAppWebhookURL       `json:"urls,omitempty"`
+	Birthday  string                     `json:"birthday,omitempty"`
+	Org       WhatsAppWebhookOrg         `json:"org,omitempty"`
 }
 
 type WhatsAppWebhookContactName struct {
@@ -141,24 +135,24 @@ type WhatsAppWebhookURL struct {
 }
 
 type WhatsAppWebhookOrg struct {
-	Company string `json:"company,omitempty"`
+	Company    string `json:"company,omitempty"`
 	Department string `json:"department,omitempty"`
-	Title   string `json:"title,omitempty"`
+	Title      string `json:"title,omitempty"`
 }
 
 type WhatsAppWebhookInteractive struct {
-	Type       string                         `json:"type"`
-	Header     *WhatsAppWebhookInteractiveHeader `json:"header,omitempty"`
-	Body       *WhatsAppWebhookInteractiveBody   `json:"body,omitempty"`
-	Footer     *WhatsAppWebhookInteractiveFooter `json:"footer,omitempty"`
-	Action     *WhatsAppWebhookInteractiveAction `json:"action,omitempty"`
-	ButtonReply *WhatsAppWebhookButtonReply     `json:"button_reply,omitempty"`
-	ListReply  *WhatsAppWebhookListReply       `json:"list_reply,omitempty"`
+	Type        string                            `json:"type"`
+	Header      *WhatsAppWebhookInteractiveHeader `json:"header,omitempty"`
+	Body        *WhatsAppWebhookInteractiveBody   `json:"body,omitempty"`
+	Footer      *WhatsAppWebhookInteractiveFooter `json:"footer,omitempty"`
+	Action      *WhatsAppWebhookInteractiveAction `json:"action,omitempty"`
+	ButtonReply *WhatsAppWebhookButtonReply       `json:"button_reply,omitempty"`
+	ListReply   *WhatsAppWebhookListReply         `json:"list_reply,omitempty"`
 }
 
 type WhatsAppWebhookInteractiveHeader struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
+	Type     string                `json:"type"`
+	Text     string                `json:"text,omitempty"`
 	Image    *WhatsAppWebhookMedia `json:"image,omitempty"`
 	Video    *WhatsAppWebhookMedia `json:"video,omitempty"`
 	Document *WhatsAppWebhookMedia `json:"document,omitempty"`
@@ -173,19 +167,19 @@ type WhatsAppWebhookInteractiveFooter struct {
 }
 
 type WhatsAppWebhookInteractiveAction struct {
-	Button string `json:"button,omitempty"`
-	Buttons []WhatsAppWebhookActionButton `json:"buttons,omitempty"`
+	Button   string                         `json:"button,omitempty"`
+	Buttons  []WhatsAppWebhookActionButton  `json:"buttons,omitempty"`
 	Sections []WhatsAppWebhookActionSection `json:"sections,omitempty"`
-	Name string `json:"name,omitempty"`
+	Name     string                         `json:"name,omitempty"`
 }
 
 type WhatsAppWebhookActionButton struct {
-	Type    string `json:"type"`
-	Reply   *WhatsAppWebhookButtonReply `json:"reply,omitempty"`
+	Type  string                      `json:"type"`
+	Reply *WhatsAppWebhookButtonReply `json:"reply,omitempty"`
 }
 
 type WhatsAppWebhookActionSection struct {
-	Title string `json:"title,omitempty"`
+	Title string                     `json:"title,omitempty"`
 	Rows  []WhatsAppWebhookActionRow `json:"rows"`
 }
 
@@ -212,30 +206,30 @@ type WhatsAppWebhookReaction struct {
 }
 
 type WhatsAppWebhookContext struct {
-	From       string `json:"from"`
-	ID         string `json:"id"`
+	From            string                          `json:"from"`
+	ID              string                          `json:"id"`
 	ReferredProduct *WhatsAppWebhookReferredProduct `json:"referred_product,omitempty"`
 }
 
 type WhatsAppWebhookReferredProduct struct {
-	CatalogID string `json:"catalog_id"`
+	CatalogID         string `json:"catalog_id"`
 	ProductRetailerID string `json:"product_retailer_id"`
 }
 
 type WhatsAppWebhookStatus struct {
-	ID            string `json:"id"`
-	Status        string `json:"status"`
-	Timestamp     string `json:"timestamp"`
-	RecipientID   string `json:"recipient_id"`
-	Conversation  *WhatsAppWebhookConversation `json:"conversation,omitempty"`
-	Pricing       *WhatsAppWebhookPricing      `json:"pricing,omitempty"`
-	Errors        []WhatsAppWebhookError       `json:"errors,omitempty"`
+	ID           string                       `json:"id"`
+	Status       string                       `json:"status"`
+	Timestamp    string                       `json:"timestamp"`
+	RecipientID  string                       `json:"recipient_id"`
+	Conversation *WhatsAppWebhookConversation `json:"conversation,omitempty"`
+	Pricing      *WhatsAppWebhookPricing      `json:"pricing,omitempty"`
+	Errors       []WhatsAppWebhookError       `json:"errors,omitempty"`
 }
 
 type WhatsAppWebhookConversation struct {
-	ID            string `json:"id"`
-	Origin        *WhatsAppWebhookConversationOrigin `json:"origin,omitempty"`
-	ExpirationTimestamp string `json:"expiration_timestamp,omitempty"`
+	ID                  string                             `json:"id"`
+	Origin              *WhatsAppWebhookConversationOrigin `json:"origin,omitempty"`
+	ExpirationTimestamp string                             `json:"expiration_timestamp,omitempty"`
 }
 
 type WhatsAppWebhookConversationOrigin struct {
@@ -256,26 +250,30 @@ type WhatsAppWebhookError struct {
 }
 
 type WhatsAppWebhookPayload struct {
-	Object string                  `json:"object"`
-	Entry  []WhatsAppWebhookEntry  `json:"entry"`
+	Object string                 `json:"object"`
+	Entry  []WhatsAppWebhookEntry `json:"entry"`
 }
 
 func VerifyWebhook(c *gin.Context) {
-	var req WhatsAppWebhookVerifyRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		c.String(http.StatusBadRequest, "Invalid request")
+	mode := c.Query("hub.mode")
+	token := c.Query("hub.verify_token")
+	challenge := c.Query("hub.challenge")
+
+	verifyToken := getEnv("WHATSAPP_APP_SECRET", "gohublink_verify_token")
+
+	if mode == "" || token == "" {
+		log.Printf("WhatsApp webhook verification failed: missing params mode=%q token=%q", mode, token)
+		c.String(http.StatusBadRequest, "Missing required parameters")
 		return
 	}
 
-	verifyToken := getEnv("WHATSAPP_VERIFY_TOKEN", "gohublink_verify_token")
-
-	if req.Mode == "subscribe" && req.VerifyToken == verifyToken {
+	if mode == "subscribe" && token == verifyToken {
 		log.Printf("WhatsApp webhook verified successfully")
-		c.String(http.StatusOK, req.Challenge)
+		c.String(http.StatusOK, challenge)
 		return
 	}
 
-	log.Printf("WhatsApp webhook verification failed: mode=%s, token_match=%v", req.Mode, req.VerifyToken == verifyToken)
+	log.Printf("WhatsApp webhook verification failed: mode=%s, token_match=%v", mode, token == verifyToken)
 	c.String(http.StatusForbidden, "Verification failed")
 }
 
@@ -605,9 +603,9 @@ func ListWhatsAppMessages(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":  messages,
-		"total": total,
-		"limit": limit,
+		"data":   messages,
+		"total":  total,
+		"limit":  limit,
 		"offset": offset,
 	})
 }
