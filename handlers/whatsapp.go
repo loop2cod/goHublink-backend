@@ -667,10 +667,10 @@ func ListWhatsAppMessages(c *gin.Context) {
 	query := db.DB.Model(&models.WhatsAppMessage{}).Order("received_at DESC")
 
 	if from != "" {
-		query = query.Where("from = ?", from)
+		query = query.Where(`"from" = ?`, from)
 	}
 	if to != "" {
-		query = query.Where("to = ?", to)
+		query = query.Where(`"to" = ?`, to)
 	}
 	if msgType != "" {
 		query = query.Where("type = ?", msgType)

@@ -45,7 +45,7 @@ func ListCustomerConversation(c *gin.Context) {
 
 	var messages []models.WhatsAppMessage
 	if err := db.DB.
-		Where("from = ? OR to = ?", phone, phone).
+		Where(`"from" = ? OR "to" = ?`, phone, phone).
 		Order("received_at ASC").
 		Find(&messages).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
