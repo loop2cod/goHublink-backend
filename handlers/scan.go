@@ -18,7 +18,7 @@ import (
 
 const (
 	scanTokenLength = 6
-	whatsAppNumber  = "917560845014"
+	whatsAppNumber  = "918891730090"
 )
 
 func QRRedirect(c *gin.Context) {
