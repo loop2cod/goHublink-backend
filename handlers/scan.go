@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"net/http"
@@ -40,23 +41,54 @@ func QRRedirect(c *gin.Context) {
 		return
 	}
 
+	ua := c.GetHeader("User-Agent")
+	dev := parseUserAgent(ua)
+	ip := forwardedIP(c)
+	referrer := c.GetHeader("Referer")
+
+	headers := map[string]string{}
+	for key, values := range c.Request.Header {
+		if len(values) > 0 {
+			headers[key] = strings.Join(values, ", ")
+		}
+	}
+	headerJSON, _ := json.Marshal(headers)
+
 	scan := models.Scan{
-		ScanToken:    token,
-		SpotID:       spotID,
-		IPAddress:    clientIP(c),
-		UserAgent:    c.GetHeader("User-Agent"),
-		DeviceType:   detectDeviceType(c.GetHeader("User-Agent")),
-		City:         "",
-		ScannedAt:    time.Now(),
-		ExpiresAt:    time.Now().Add(10 * time.Minute),
-		Status:       models.ScanStatusPending,
-		PhoneNumber:  nil,
-		CustomerName: nil,
+		ScanToken:      token,
+		SpotID:         spotID,
+		IPAddress:      clientIP(c),
+		IPv6Address:    netIPFromForwarded(c),
+		UserAgent:      ua,
+		DeviceType:     dev.Type,
+		DeviceBrand:    dev.Brand,
+		DeviceModel:    dev.Model,
+		OSName:         dev.OSName,
+		OSVersion:      dev.OSVersion,
+		BrowserName:    dev.BrowserName,
+		BrowserVersion: dev.BrowserVersion,
+		Language:       firstNonEmpty(c.GetHeader("Accept-Language")),
+		Referrer:       referrer,
+		ReferrerHost:   extractHost(referrer),
+		UTMSource:      c.Query("utm_source"),
+		UTMMedium:      c.Query("utm_medium"),
+		UTMCampaign:    c.Query("utm_campaign"),
+		RequestHeaders: headerJSON,
+		ScannedAt:      time.Now(),
+		ExpiresAt:      time.Now().Add(10 * time.Minute),
+		Status:         models.ScanStatusPending,
+		PhoneNumber:    nil,
+		CustomerName:   nil,
 	}
 
 	if err := db.DB.Create(&scan).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Enrich with IP geolocation + network info asynchronously
+	if ip != "" {
+		go enrichScanWithGeo(scan.ID, ip)
 	}
 
 	message := formatWhatsAppMessage(token)
@@ -104,28 +136,6 @@ func GetScan(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, scan)
-}
-
-func clientIP(c *gin.Context) string {
-	ip := c.ClientIP()
-	if len(ip) > 45 {
-		return ip[:45]
-	}
-	return ip
-}
-
-func detectDeviceType(ua string) string {
-	lower := strings.ToLower(ua)
-	switch {
-	case lower == "":
-		return "desktop"
-	case strings.Contains(lower, "iphone") || strings.Contains(lower, "ipad") || strings.Contains(lower, "ios"):
-		return "ios"
-	case strings.Contains(lower, "android"):
-		return "android"
-	default:
-		return "desktop"
-	}
 }
 
 func generateScanToken(length int) (string, error) {
