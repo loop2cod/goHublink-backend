@@ -9,6 +9,8 @@ import (
 
 func Setup(r *gin.Engine) {
 	r.GET("/qr/:spot_id", handlers.QRRedirect)
+	r.GET("/api/network/count", handlers.NetworkCount)
+	r.GET("/api/network/count/stream", handlers.NetworkCountStream)
 	r.POST("/api/auth/login", handlers.Login)
 	r.POST("/api/auth/refresh", handlers.RefreshToken)
 	r.POST("/api/auth/logout", handlers.Logout)
