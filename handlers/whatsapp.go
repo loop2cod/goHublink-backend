@@ -601,6 +601,7 @@ func extractToken(text string) string {
 		return ""
 	}
 	last := words[len(words)-1]
+	last = strings.ToUpper(last)
 	if len(last) >= scanTokenLength && len(last) <= scanTokenLength+1 {
 		for _, ch := range last {
 			if !isTokenChar(ch) {
@@ -614,7 +615,6 @@ func extractToken(text string) string {
 
 func isTokenChar(ch rune) bool {
 	return (ch >= 'A' && ch <= 'Z') ||
-		(ch >= 'a' && ch <= 'z') ||
 		(ch >= '0' && ch <= '9')
 }
 

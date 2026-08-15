@@ -59,14 +59,13 @@ func QRRedirect(c *gin.Context) {
 		return
 	}
 
-	message := formatWhatsAppMessage(spot.Name, token)
+	message := formatWhatsAppMessage(token)
 	waURL := "https://wa.me/" + whatsAppNumber + "?text=" + url.QueryEscape(message)
 	c.Redirect(http.StatusFound, waURL)
 }
 
-func formatWhatsAppMessage(spotName, token string) string {
-	return "Hi! I just grabbed a spot at " + spotName + ".\n" +
-		"My token is: " + token
+func formatWhatsAppMessage(token string) string {
+	return "Claim it: " + token
 }
 
 func ListScans(c *gin.Context) {
@@ -130,7 +129,7 @@ func detectDeviceType(ua string) string {
 }
 
 func generateScanToken(length int) (string, error) {
-	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	buf := make([]byte, length)
 	for i := range buf {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
