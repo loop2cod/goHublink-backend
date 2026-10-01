@@ -17,7 +17,7 @@ func Migrate() error {
 	if err := ensureWhatsAppEnums(); err != nil {
 		return err
 	}
-	if err := DB.AutoMigrate(&models.Admin{}, &models.Spot{}, &models.RefreshToken{}, &models.Scan{}, &models.Customer{}, &models.WhatsAppMessage{}, &models.WhatsAppWebhookEvent{}); err != nil {
+	if err := DB.AutoMigrate(&models.Admin{}, &models.Spot{}, &models.RefreshToken{}, &models.Scan{}, &models.Customer{}, &models.WhatsAppMessage{}, &models.WhatsAppWebhookEvent{}, &models.City{}, &models.Division{}); err != nil {
 		return err
 	}
 	log.Println("Database schema synced with models")
@@ -89,5 +89,10 @@ func Seed() error {
 		}
 		log.Println("Seeded default spot with id ONLINE")
 	}
+
+	if err := SeedCities(); err != nil {
+		log.Printf("Warning: failed to seed cities: %v", err)
+	}
+
 	return nil
 }

@@ -13,6 +13,8 @@ type Spot struct {
 	IDCardName    string    `gorm:"default:''" json:"idcard_name"`
 	IDCardDOB     string    `gorm:"default:''" json:"idcard_dob"`
 	IDCardNumber  string    `gorm:"default:''" json:"idcard_number"`
+	CityID        string    `gorm:"size:64;default:''" json:"city_id"`
+	DivisionID    string    `gorm:"size:64;default:''" json:"division_id"`
 	IsActive      bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt     time.Time `json:"created_at"`
 }
