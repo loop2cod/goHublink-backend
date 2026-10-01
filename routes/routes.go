@@ -14,6 +14,8 @@ func Setup(r *gin.Engine) {
 	r.POST("/api/auth/login", handlers.Login)
 	r.POST("/api/auth/refresh", handlers.RefreshToken)
 	r.POST("/api/auth/logout", handlers.Logout)
+	r.POST("/api/auth/claim", handlers.ClaimScanToken)
+	r.POST("/api/auth/verify", handlers.VerifyUserToken)
 
 	r.GET("/webhook/whatsapp", handlers.VerifyWebhook)
 	r.POST("/webhook/whatsapp", handlers.ReceiveWhatsAppWebhook)
@@ -44,5 +46,16 @@ func Setup(r *gin.Engine) {
 		protected.GET("/whatsapp/messages/:id", handlers.GetWhatsAppMessage)
 		protected.GET("/whatsapp/conversation/:phone", handlers.ListCustomerConversation)
 		protected.POST("/whatsapp/send", handlers.SendWhatsAppMessage)
+	}
+
+	userProtected := r.Group("/api", auth.UserMiddleware())
+	{
+		userProtected.GET("/auth/me", handlers.GetCurrentUser)
+		userProtected.GET("/wallet", handlers.GetWallet)
+		userProtected.GET("/wallet/transactions", handlers.GetWalletTransactions)
+		userProtected.GET("/offers", handlers.ListOffers)
+		userProtected.GET("/offers/claimed", handlers.ListClaimedOffers)
+		userProtected.GET("/offers/:id", handlers.GetOffer)
+		userProtected.POST("/offers/:id/claim", handlers.ClaimOffer)
 	}
 }

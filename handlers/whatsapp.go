@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -559,9 +563,14 @@ func updateCustomerActivity(tx *gorm.DB, phoneNumber, customerName string) {
 
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
+			authToken, err := generateAuthToken()
+			if err != nil {
+				log.Printf("Failed to generate auth token: %v", err)
+			}
 			customer = models.Customer{
 				PhoneNumber: phoneNumber,
 				Name:        customerName,
+				AuthToken:   authToken,
 				FirstScanAt: time.Now(),
 				LastActive:  time.Now(),
 			}
@@ -579,6 +588,14 @@ func updateCustomerActivity(tx *gorm.DB, phoneNumber, customerName string) {
 	customer.LastActive = time.Now()
 	if customerName != "" && customer.Name == "" {
 		customer.Name = customerName
+	}
+	if customer.AuthToken == "" {
+		authToken, err := generateAuthToken()
+		if err != nil {
+			log.Printf("Failed to generate auth token: %v", err)
+		} else {
+			customer.AuthToken = authToken
+		}
 	}
 	if err := tx.Save(&customer).Error; err != nil {
 		log.Printf("Failed to update customer activity: %v", err)
@@ -641,8 +658,197 @@ func matchScanByToken(tx *gorm.DB, token, phoneNumber, customerName string) {
 
 	log.Printf("Scan %s matched with customer %s (%s)", scan.ScanToken, customerName, phoneNumber)
 
-	// Welcome message will be sent via template (to be implemented later)
-	// sendWelcomeMessage(phoneNumber, customerName)
+	if _, err := awardPointsToWallet(tx, phoneNumber, welcomeBonusPoints, "scan check-in: "+scan.SpotID, scan.ScanToken); err != nil {
+		log.Printf("Failed to award %d points to %s: %v", welcomeBonusPoints, phoneNumber, err)
+		return
+	}
+
+	var customer models.Customer
+	db.DB.Where("phone_number = ?", phoneNumber).First(&customer)
+	sendWelcomeMessage(phoneNumber, customerName, scan.ScanToken, customer.AuthToken)
+}
+
+const welcomeBonusPoints = 250
+
+func sendWelcomeMessage(phoneNumber, customerName, scanToken, authToken string) {
+	name := customerName
+	if name == "" {
+		name = "there"
+	}
+
+	url := authToken
+
+	if err := sendWhatsAppTemplateMessage(phoneNumber, name, url); err != nil {
+		log.Printf("Failed to send welcome message to %s: %v", phoneNumber, err)
+		return
+	}
+
+	log.Printf("Welcome message sent to %s", phoneNumber)
+}
+
+func generateAuthToken() (string, error) {
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const length = 16
+	buf := make([]byte, length)
+	for i := range buf {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "", err
+		}
+		buf[i] = charset[n.Int64()]
+	}
+	return string(buf), nil
+}
+
+func sendWhatsAppTextMessage(phoneNumber, text string) error {
+	apiURL := strings.TrimSpace(os.Getenv("WHATSAPP_API_URL"))
+	accessToken := strings.TrimSpace(os.Getenv("WHATSAPP_ACCESS_TOKEN"))
+	from := whatsappPhoneNumberID()
+
+	if apiURL == "" || accessToken == "" {
+		return errors.New("WhatsApp API not configured")
+	}
+
+	payload := map[string]interface{}{
+		"messaging_product": "whatsapp",
+		"to":                phoneNumber,
+		"type":              "text",
+		"text":              map[string]string{"body": text},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 20 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var messageID string
+	var apiErr string
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		var result struct {
+			Messages []struct {
+				ID string `json:"id"`
+			} `json:"messages"`
+		}
+		if err := json.Unmarshal(respBody, &result); err == nil && len(result.Messages) > 0 {
+			messageID = result.Messages[0].ID
+		}
+	} else {
+		apiErr = strings.TrimSpace(string(respBody))
+		if apiErr == "" {
+			apiErr = fmt.Sprintf("WhatsApp API returned %d", resp.StatusCode)
+		}
+	}
+
+	textBody := text
+	now := time.Now()
+	waMsg := models.WhatsAppMessage{
+		MessageID:  messageID,
+		From:       from,
+		To:         phoneNumber,
+		Type:       models.WhatsAppMessageTypeText,
+		Direction:  models.WhatsAppMessageDirectionOutbound,
+		TextBody:   &textBody,
+		RawPayload: body,
+		Status:     "sent",
+		ReceivedAt: now,
+	}
+
+	if apiErr != "" {
+		waMsg.Status = "failed"
+		waMsg.ErrorMessage = &apiErr
+	}
+
+	return db.DB.Create(&waMsg).Error
+}
+
+func sendWhatsAppTemplateMessage(phoneNumber, name, url string) error {
+	apiURL := strings.TrimSpace(os.Getenv("WHATSAPP_API_URL"))
+	accessToken := strings.TrimSpace(os.Getenv("WHATSAPP_ACCESS_TOKEN"))
+
+	if apiURL == "" || accessToken == "" {
+		return errors.New("WhatsApp API not configured")
+	}
+
+	payload := map[string]interface{}{
+		"messaging_product": "whatsapp",
+		"recipient_type":    "individual",
+		"to":                phoneNumber,
+		"type":              "template",
+		"template": map[string]interface{}{
+			"name": "new_init",
+			"language": map[string]interface{}{
+				"code": "en",
+			},
+			"components": []map[string]interface{}{
+				{
+					"type": "body",
+					"parameters": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": name,
+						},
+					},
+				},
+				{
+					"type":     "button",
+					"sub_type": "url",
+					"index":    "0",
+					"parameters": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": url,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 20 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		apiErr := strings.TrimSpace(string(respBody))
+		if apiErr == "" {
+			apiErr = fmt.Sprintf("WhatsApp API returned %d", resp.StatusCode)
+		}
+		return errors.New(apiErr)
+	}
+
+	return nil
 }
 
 func isDuplicateKeyError(err error) bool {

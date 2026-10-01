@@ -17,7 +17,7 @@ func Migrate() error {
 	if err := ensureWhatsAppEnums(); err != nil {
 		return err
 	}
-	if err := DB.AutoMigrate(&models.Admin{}, &models.Spot{}, &models.RefreshToken{}, &models.Scan{}, &models.Customer{}, &models.WhatsAppMessage{}, &models.WhatsAppWebhookEvent{}, &models.City{}, &models.Division{}); err != nil {
+	if err := DB.AutoMigrate(&models.Admin{}, &models.Spot{}, &models.RefreshToken{}, &models.Scan{}, &models.Customer{}, &models.WhatsAppMessage{}, &models.WhatsAppWebhookEvent{}, &models.City{}, &models.Division{}, &models.Wallet{}, &models.WalletTransaction{}, &models.Offer{}, &models.ClaimedOffer{}); err != nil {
 		return err
 	}
 	log.Println("Database schema synced with models")

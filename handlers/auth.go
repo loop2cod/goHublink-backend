@@ -113,6 +113,12 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
+	// App user token (issued via /api/auth/verify): rotate and re-issue user tokens.
+	if stored.PhoneNumber != "" {
+		issueUserTokens(c, stored.PhoneNumber)
+		return
+	}
+
 	var admin models.Admin
 	if err := db.DB.First(&admin, stored.AdminID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -120,6 +126,39 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	issueTokens(c, &admin)
+}
+
+func issueUserTokens(c *gin.Context, phoneNumber string) {
+	accessToken, err := auth.GenerateUserAccessToken(phoneNumber, auth.AccessTokenTTL())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate access token"})
+		return
+	}
+
+	userRefreshToken, err := auth.GenerateRefreshToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate refresh token"})
+		return
+	}
+
+	rt := models.RefreshToken{
+		AdminID:     0,
+		PhoneNumber: phoneNumber,
+		TokenHash:   auth.HashRefreshToken(userRefreshToken),
+		ExpiresAt:   time.Now().Add(auth.UserRefreshTokenTTL()),
+	}
+	if err := db.DB.Create(&rt).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store refresh token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"access_token":  accessToken,
+		"token":         accessToken,
+		"refresh_token": userRefreshToken,
+		"expires_in":    int64(auth.AccessTokenTTL().Seconds()),
+		"phone_number":  phoneNumber,
+	})
 }
 
 type logoutRequest struct {

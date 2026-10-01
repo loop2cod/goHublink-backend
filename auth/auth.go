@@ -17,6 +17,11 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+type UserClaims struct {
+	PhoneNumber string `json:"phone_number"`
+	jwt.RegisteredClaims
+}
+
 func jwtSecret() []byte {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
@@ -70,6 +75,38 @@ func ParseToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
+func GenerateUserAccessToken(phoneNumber string, ttl time.Duration) (string, error) {
+	claims := UserClaims{
+		PhoneNumber: phoneNumber,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "gohublink-backend",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret())
+}
+
+func ParseUserToken(tokenString string) (*UserClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return jwtSecret(), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*UserClaims)
+	if !ok || !token.Valid {
+		return nil, errors.New("invalid token")
+	}
+	return claims, nil
+}
+
 // RefreshTokenTTL returns the lifetime of a refresh token (default 30 days).
 func RefreshTokenTTL() time.Duration {
 	if v := os.Getenv("REFRESH_TOKEN_TTL"); v != "" {
@@ -78,6 +115,17 @@ func RefreshTokenTTL() time.Duration {
 		}
 	}
 	return time.Hour * 24 * 30
+}
+
+// UserRefreshTokenTTL returns the lifetime of an app user refresh token
+// (default 365 days, so users stay logged in on the same browser).
+func UserRefreshTokenTTL() time.Duration {
+	if v := os.Getenv("USER_REFRESH_TOKEN_TTL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+	}
+	return time.Hour * 24 * 365
 }
 
 // GenerateRefreshToken returns a cryptographically random opaque refresh token.

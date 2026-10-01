@@ -26,3 +26,21 @@ func Middleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func UserMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		if header == "" || !strings.HasPrefix(header, "Bearer ") {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization header"})
+			return
+		}
+		token := strings.TrimPrefix(header, "Bearer ")
+		claims, err := ParseUserToken(token)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			return
+		}
+		c.Set("phone_number", claims.PhoneNumber)
+		c.Next()
+	}
+}
